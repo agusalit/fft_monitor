@@ -1,0 +1,21 @@
+# Credentials - NEVER COMMIT THESE!
+credentials.h
+
+# Arduino build files
+*.hex
+*.bin
+*.elf
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*~
+```

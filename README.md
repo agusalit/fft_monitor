@@ -1,66 +1,229 @@
-**fft_monitor**
+# ESP32 MPU6050 FFT Analysis
 
-**Overview**
-- **Project:**: Lightweight C++ repository containing `fft_monitor.cpp` and `i2c_scanner.cpp` for experimenting with FFT-based monitoring and simple I2C scanning utilities.
-- **Language:**: C++ (single-file examples)
+Real-time FFT analysis on ESP32 with MPU6050 sensor for vibration detection and frequency analysis. Includes IoT dashboard monitoring and adaptive gimbal stabilizer concept.
 
-**Purpose**
-- **fft_monitor**: a compact example program intended as a starting point for FFT-based signal analysis or monitoring on desktop or embedded Linux development systems.
-- **i2c_scanner**: a simple utility to detect I2C devices on a bus (useful when connecting sensors or peripherals).
+## 📦 What's Included
 
-**Repository Layout**
-- `fft_monitor.cpp`: main FFT monitoring example code.
-- `i2c_scanner.cpp`: small I2C bus scanner utility.
-- `README.md`: this document.
+| File | Description |
+|------|-------------|
+| **fft_monitor.ino** | Main FFT implementation with Thinger.io dashboard |
+| **gimbal_stabilizer.ino** | Adaptive gimbal concept with frequency-based PID |
+| **i2c_scanner.ino** | I2C address scanner utility (for troubleshooting) |
+| **credentials_template.h** | Template for WiFi and Thinger.io credentials |
 
-**Prerequisites**
-- **Compiler:**: A C++ compiler supporting C++11 or newer (e.g., `g++`, `clang++`).
-- **Platform notes:**: If you plan to run `i2c_scanner` on embedded Linux (Raspberry Pi, BeagleBone, etc.), you may need I2C-dev headers/libraries and proper permissions (or run as root).
+## 🛠️ Hardware Requirements
 
-**Build (generic)**
-You can compile the files directly with `g++` or `clang++`.
+- **ESP32 DevKit** (any variant)
+- **MPU6050** (6-axis IMU)
+- **3x Servo Motors** (for gimbal_stabilizer.ino only)
+- **3x LED + 220Ω Resistors** (for gimbal_stabilizer.ino only)
+- Breadboard & jumper wires
 
-- Build `fft_monitor`:
+## 📚 Required Libraries
+
+Install via Arduino IDE Library Manager:
+
 ```
-g++ -std=c++11 -O2 fft_monitor.cpp -o fft_monitor
-```
-
-- Build `i2c_scanner`:
-```
-g++ -std=c++11 -O2 i2c_scanner.cpp -o i2c_scanner
-```
-
-Notes:
-- If either source requires additional libraries (for example libfftw3, wiringPi, or platform-specific I2C libraries), add the relevant `-l` flags and include paths. Example linking FFTW:
-```
-g++ -std=c++11 fft_monitor.cpp -lfftw3 -o fft_monitor
+- Adafruit MPU6050
+- Adafruit Unified Sensor
+- arduinoFFT
+- ThingerESP32 (for fft_monitor.ino)
+- ESP32Servo (for gimbal_stabilizer.ino)
 ```
 
-**Run / Usage**
-- Run the FFT monitor (if it reads from stdin or a device):
+## 🔌 Wiring
+
+### Basic Setup (All Sketches)
 ```
-./fft_monitor
+MPU6050  →  ESP32
+VCC      →  3.3V
+GND      →  GND
+SDA      →  GPIO 21
+SCL      →  GPIO 22
 ```
-- Run the I2C scanner (on systems with `/dev/i2c-*`):
+
+### Additional for gimbal_stabilizer.ino
 ```
-sudo ./i2c_scanner
+Servo Pitch  →  GPIO 25
+Servo Roll   →  GPIO 26
+Servo Yaw    →  GPIO 27
+
+LED Green    →  GPIO 2 → 220Ω → GND
+LED Yellow   →  GPIO 4 → 220Ω → GND
+LED Red      →  GPIO 5 → 220Ω → GND
 ```
 
-If the program expects arguments or input streams, pass them on the command line. Check the source files for any configurable parameters (sample rate, buffer sizes, device paths).
+## 🚀 Quick Start
 
-**Troubleshooting**
-- Compilation fails: inspect the error for missing headers or libraries and install the required development packages.
-- Running `i2c_scanner` yields permission errors: run with `sudo` or add your user to the `i2c` group on Linux.
-- If `fft_monitor` expects platform-specific input (audio device, ADC, or sensor), ensure device drivers and permissions are configured.
+### 1. Setup Credentials (fft_monitor.ino only)
 
-**Contributing**
-- Improvements, bugfixes, and documentation edits are welcome. Please open issues or pull requests in the repository.
+Copy `credentials_template.h` to `credentials.h`:
 
-**License & Attribution**
-- No license file is included in this repo. If you intend to share or reuse this project, consider adding an open-source license (for example, `MIT` or `Apache-2.0`).
+```cpp
+// credentials.h
+#define USERNAME "your_thinger_username"
+#define DEVICE_ID "your_device_id"
+#define DEVICE_CREDENTIAL "your_credential"
+#define WIFI_SSID "your_wifi_ssid"
+#define WIFI_PASSWORD "your_password"
+```
 
-**Contact / Author**
-- Repository owner: `agusalit` (see GitHub repository for contact and issue tracker).
+**⚠️ Don't commit credentials.h to Git!**
 
-------
-Small, focused examples like these are intended as starting points — adapt the build flags and external libraries to your target platform and needs.
+### 2. Upload Sketch
+
+1. Open `.ino` file in Arduino IDE
+2. Select **Board:** ESP32 Dev Module
+3. Select **Port:** Your ESP32 COM port
+4. Click **Upload**
+
+### 3. View Results
+
+**For fft_monitor.ino:**
+- Serial Monitor: 115200 baud
+- Thinger.io Dashboard: https://console.thinger.io
+
+**For gimbal_stabilizer.ino:**
+- Serial Monitor: 115200 baud
+- Watch LED indicators for system status
+
+**For i2c_scanner.ino:**
+- Serial Monitor: 115200 baud
+- Check detected I2C addresses
+
+## 📊 What Each Sketch Does
+
+### fft_monitor.ino
+- Samples accelerometer at 2 kHz (256 samples)
+- Performs FFT to detect dominant frequency per axis
+- Calculates magnitude and amplitude
+- Sends data to Thinger.io for real-time visualization
+- Displays results in Serial Monitor
+
+**Output Example:**
+```
+╔════════════════════════════════════════╗
+║         FFT ANALYSIS RESULTS           ║
+╚════════════════════════════════════════╝
+
+🔴 X-Axis:
+  Dominant Frequency: 23.44 Hz
+  Magnitude: 234.67
+  Amplitude: 0.456 m/s²
+```
+
+### gimbal_stabilizer.ino
+- Same FFT analysis as fft_monitor
+- Classifies vibration into 4 modes:
+  - **COMFORT** (0-10 Hz): Green LED, soft PID
+  - **STANDARD** (10-20 Hz): Green LED, balanced PID
+  - **SPORT** (20-40 Hz): Yellow LED, aggressive PID
+  - **EXTREME** (>40 Hz): Red LED, maximum dampening
+- Auto-adjusts servo PID parameters based on frequency
+- Provides vibration score (0-100) and quality rating
+
+**Output Example:**
+```
+🎯 STABILIZATION MODE:
+  Current Mode: SPORT (Active Movement)
+  Condition: Walking
+
+⚙️  ADAPTIVE PID PARAMETERS:
+  Kp = 1.80 | Ki = 0.30 | Kd = 0.80
+
+💡 STATUS INDICATOR:
+  🟡 YELLOW - Moderate Vibration Detected
+```
+
+### i2c_scanner.ino
+- Scans I2C bus (addresses 0x00 to 0x7F)
+- Reports found devices
+- Useful for debugging MPU6050 connection issues
+
+**Output Example:**
+```
+I2C Scanner
+Scanning...
+I2C device found at address 0x68  !
+done
+```
+
+## 🔧 Troubleshooting
+
+### MPU6050 not found
+1. Run `i2c_scanner.ino` to verify connection
+2. Check wiring (especially SDA/SCL)
+3. Verify VCC is 3.3V (not 5V!)
+4. Try pressing EN button on ESP32
+
+### WiFi connection failed (fft_monitor.ino)
+1. Verify credentials.h exists and has correct values
+2. Ensure WiFi is 2.4GHz (ESP32 doesn't support 5GHz)
+3. Check signal strength
+
+### Upload failed
+- Hold BOOT button during upload
+- Release when "Connecting..." appears
+- Check correct COM port selected
+
+### Servo jitter (gimbal_stabilizer.ino)
+- Use external power supply for servos
+- Add capacitor (100µF) across servo power
+- Reduce PID gains if oscillating
+
+## 📖 FFT Analysis Explained
+
+**Sampling:** 256 samples at 2000 Hz (or 1000 Hz for gimbal)
+
+**Frequency Resolution:** 
+- fft_monitor: 2000 Hz / 256 = 7.8 Hz per bin
+- gimbal_stabilizer: 1000 Hz / 128 = 7.8 Hz per bin
+
+**Windowing:** Hamming window to reduce spectral leakage
+
+**Typical Frequency Ranges:**
+- 0-10 Hz: Very slow motion (smooth panning)
+- 10-20 Hz: Hand tremor
+- 20-40 Hz: Walking / human motion
+- 40-80 Hz: Running / fast movement
+- '>80 Hz: High-frequency noise
+
+## 🎯 Use Cases
+
+- **Vibration Monitoring:** Detect machine vibrations
+- **Motion Analysis:** Classify human activities (walking, running)
+- **Gimbal Stabilization:** Auto-tune stabilizer parameters
+- **Fall Detection:** Detect sudden high-frequency impacts
+- **Structural Monitoring:** Building vibration analysis
+
+## 🤝 Contributing
+
+Contributions welcome! Please:
+1. Fork the repo
+2. Create feature branch
+3. Commit your changes
+4. Push and create pull request
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file
+
+## 👨‍💻 Author
+
+**I Putu Agus Alit Putra Dana**
+- GitHub: [@agusalit](https://github.com/agusalit)
+- Institution: ITB STIKOM Bali
+
+## 🙏 Acknowledgments
+
+- Adafruit MPU6050 Library
+- arduinoFFT by Enrique Condes
+- Thinger.io Platform
+
+---
+
+⭐ **Star this repo if you find it useful!** ⭐
+
+## Issues & Questions
+
+Found a bug or have questions? [Open an issue](https://github.com/agusalit/fft_monitor/issues)
